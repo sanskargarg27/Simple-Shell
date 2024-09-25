@@ -16,6 +16,26 @@ typedef struct{
 
 history_t HistoryList[100];
 int historyCnt = 0;
+
+void command_history(){
+    if(historyCnt==0){
+        printf("No commands in history\n");
+        return;
+    }
+    // printf("Command History: \n");
+    int i=0;
+    while(i<historyCnt){
+        printf("Command [%d]:\n",i+1);
+        printf("PID: %d\n", HistoryList[i].pid);
+        printf("Command: %s\n", HistoryList[i].command);
+        printf("Start time: %s", ctime(&HistoryList[i].start_time));
+        printf("Execution Duration: %.2f seconds\n", HistoryList[i].execution_time);
+        printf("-----------------------------\n");
+        i++;
+    }
+
+}
+
  
 int create_process_and_run(char* cmd){
     if (strcmp(cmd, "exit") == 0){
@@ -93,6 +113,7 @@ char* read_user_input(){
     
     return inp;
 }
+
 int run_piped_process(char* cmd1, char* cmd2, char* cmd){
     int pipe_fd[2]; // Pipe - read & write end
     pid_t pid1, pid2; // This is a child 1 & child 2 - forked twice xD
@@ -192,7 +213,7 @@ void sigint_handler(int signum){
     printf("\nCtrl-c pressed\n");
     printf("\nExiting the shell...........\n");
     printf("Command History:\n");
-    // display_history();  // Calling the function to display the command history 
+    command_history();  // Calling the function to display the command history 
     exit(0);  
 }
 
@@ -214,7 +235,6 @@ void shell_loop(){
     do {
         printf("simpleShell:~$ ");
         char* cmd = read_user_input();
-        printf("cmd: %s\n", cmd);
         status = launch(cmd);
         free(cmd);
     } while(status);
