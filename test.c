@@ -20,7 +20,52 @@ int create_process_and_run() {
     }
     return 0;
 }
+void func(){
+    int a = 1;
+    char cmd[] = "ls";
+    if (a == 1){
+        system(cmd);
+    }
+}
+int execute_piped_commands(char *cmd) {
+    int pipe_fd[2]; // Pipe - read & write end
+    pid_t pid1, pid2; // This is a child 1 & child 2 - forked twice xD
 
+    if (pipe(pipe_fd) == -1) { // Create a pipe
+        perror("Pipe error");
+        exit(EXIT_FAILURE);
+    }
+
+    pid1 = fork();
+
+    if (pid1 < 0) {
+        perror("Fork error");
+        exit(EXIT_FAILURE);
+    }
+    else if (pid1 == 0) { // Child process 1 (writes to the pipe)
+        close(pipe_fd[0]); // Close the read end of the pipe
+        if (dup2(pipe_fd[1], STDOUT_FILENO) == -1) {
+            perror("dup2 error");
+            exit(EXIT_FAILURE);
+        }
+        close(pipe_fd[1]);
+
+        // Execute the first command
+        if (system(cmd) == -1) { // Systuummmmm - To execute command. IYKYK ; )
+            perror("System error");
+            exit(EXIT_FAILURE);
+        }
+        exit(EXIT_SUCCESS);
+    }
+    else { // Parent process
+        printf("here");
+        if (waitpid(pid1, NULL, 0) == -1) {
+            perror("waitpid error");
+            exit(EXIT_FAILURE);
+        }
+    }
+    return 1;
+}
 int main() {
     // int error_code = 404;
     
@@ -42,7 +87,12 @@ int main() {
     // char* inp;
     // fgets(inp, sizeof(inp), stdin);
     // printf("%s", inp);
-    create_process_and_run();
+    // create_process_and_run();
+
+    char cmd[] = "cat t.txt | ./a.out";
+    // system(cmd);
+    execute_piped_commands(cmd);
+    printf("Here\n");
     
     
     return 0;

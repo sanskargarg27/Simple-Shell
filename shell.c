@@ -88,20 +88,32 @@ char* read_user_input(){
 }
 
 int launch(char* cmd){
+    int status;
     // Unpiped command
     if (strchr(cmd, '|') == NULL){
-        int status;
         status = create_process_and_run(cmd);
-        return status;
     }
     // Piped command
     else{
+        char* token = strtok(cmd, "|");
 
+        char* cmd1;
+        char* cmd2;
+
+        while (token != NULL){
+            cmd1 = token;
+            token = strtok(NULL, "|");
+        }
+        remove_space(cmd1);
+        remove_space(cmd2);
+        // printf("C1: %s, C2: %s", cmd1, cmd2);
+        status = run_piped_process(cmd1, cmd2);
     }
+    return status;
 }
 // Signal handler for SIGINT (Ctrl+C)
 void sigint_handler(int signum){
-    printf("Ctrl-c pressed\n");
+    printf("\nCtrl-c pressed\n");
     printf("\nExiting the shell...........\n");
     printf("Command History:\n");
     // display_history();  // Calling the function to display the command history 
