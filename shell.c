@@ -7,7 +7,25 @@
 #include <sys/wait.h>
 #include <time.h>
 
-void command_history();
+void command_history(){
+    if(historyCnt==0){
+        printf("No commands in history\n");
+        return;
+    }
+    // printf("Command History: \n");
+    int i=0;
+    while(i<historyCnt){
+        printf("Command [%d]:\n",i+1);
+        printf("PID: %d\n", HistoryList[i].pid);
+        printf("Command: %s\n", HistoryList[i].command);
+        printf("Start time: %s", ctime(&HistoryList[i].start_time));
+        printf("Execution Duration: %.2f seconds\n", HistoryList[i].execution_time);
+        printf("-----------------------------\n");
+        i++;
+    }
+
+}
+
 typedef struct{
     char command[1024]; 
     time_t start_time;
@@ -132,24 +150,6 @@ void shell_loop(){
         status = launch(cmd);
         free(cmd);
     } while(status);
-}
-void command_history(){
-    if(historyCnt==0){
-        printf("No commands in history\n");
-        return;
-    }
-    // printf("Command History: \n");
-    int i=0;
-    while(i<historyCnt){
-        printf("Command [%d]:\n",i+1);
-        printf("PID: %d\n", HistoryList[i].pid);
-        printf("Command: %s\n", HistoryList[i].command);
-        printf("Start time: %s", ctime(&HistoryList[i].start_time));
-        printf("Execution Duration: %.2f seconds\n", HistoryList[i].execution_time);
-        printf("-----------------------------\n");
-        i++;
-    }
-
 }
 
 int main(){
