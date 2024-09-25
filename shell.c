@@ -106,22 +106,73 @@ char* read_user_input(){
     
     return inp;
 }
+int run_piped_process(char* cmd1, char* cmd2){
+    pid_t pid1, pid2;
+    int fd[2];
+
+    pipe(fd);
+
+    pid1 = fork();
+    if (pid1 < 0){
+        perror("fork error");
+    }
+    else if (pid1 == 0){
+        close(fd[0]);
+        dup2(fd[1], STDOUT_FILENO);
+        close(fd[1]);
+        system(cmd1);
+        exit(1);
+    }
+    else{
+        pid2 = fork();
+
+        if (pid2 < 0){
+            perror("fork error");
+        }
+        else if (pid2 == 0){
+            close(fd[1]);
+            dup2(fd[0], STDIN_FILENO);
+            close(fd[0]);
+            system(cmd2);
+            exit(1);
+        }
+        else{
+            close(fd[0]);
+            close(fd[1]);
+            waitpid(pid1, NULL, 0);
+            waitpid(pid2, NULL, 0);
+        }
+    }
+    return 1;
+}
 
 int launch(char* cmd){
+    int status;
     // Unpiped command
     if (strchr(cmd, '|') == NULL){
-        int status;
         status = create_process_and_run(cmd);
-        return status;
     }
     // Piped command
     else{
+        char* token = strtok(cmd, "|");
 
+        char* cmd1;
+        char* cmd2;
+
+        while (token != NULL){
+            cmd1 = token;
+            token = strtok(NULL, "|");
+        }
+        remove_space(cmd1);
+        remove_space(cmd2);
+        // printf("C1: %s, C2: %s", cmd1, cmd2);
+        status = run_piped_process(cmd1, cmd2);
     }
+    return status;
 }
 // Signal handler for SIGINT (Ctrl+C)
 void sigint_handler(int signum){
-    printf("Ctrl-c pressed\n");
+    printf("\nCtrl-c pressed\n");
     printf("\nExiting the shell...........\n");
     printf("Command History:\n");
     command_history();  // Calling the function to display the command history 
