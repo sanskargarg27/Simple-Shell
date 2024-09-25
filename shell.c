@@ -25,6 +25,99 @@ void command_history(){
     }
 
 }
+int history_piped_commands(char*cmd){
+    char *save_state; // pointer for strtok_r
+    char*tok;
+    int pipe_fd[2]; //pipe for IPC
+    int input_fd=0;
+    pid_t pid;
+    int cmd_cnt=0;
+    // tokenize the input
+    tok= strtok_r(cmd,"|", &save_state);
+// processing each command
+    while(tok!=NULL){
+        remove_space(tok);
+        // creating a pipe
+        if(pipe(pipe_fd)==-1){
+            perror("Pipe error");
+            exit(EXIT_FAILURE);
+        }
+
+        // fork and executing the command
+        pid=fork();
+        if(pid<0){
+            perror("fork error");
+            exit(EXIT_FAILURE);
+        }
+        else if(pid==0){
+            // child process
+            if(input_fd!=0){
+                dup2(input_fd,STDIN_FILENO);
+                close(input_fd);
+                // read from previous pipe, if not the first command
+            }
+            if(save_state!=NULL){
+                dup2(pipe_fd[1],STDOUT_FILENO);
+                // write to the current pipe 
+            }
+            close(pipe_fd[0]);
+            close(pipe_fd[1]);
+            // closing the ends of the pipe
+
+            char*args[100];
+            int cnt=0;
+            char*arg_tok=strtok(tok, " ");
+            // tokenizing for exec
+            while(arg_tok!=NULL && cnt<100){
+                args[cnt++]=arg_tok;
+                arg_tok=strtok(NULL, " ");
+            }
+            args[cnt]=NULL;
+            execvp(args[0], args);
+            // execute
+            perror("exec failed");
+            exit(EXIT_FAILURE);
+        }
+        else{
+            // parent process
+            close(pipe_fd[1]);
+            // closing the write end
+            if(historyCnt<100){
+                strncpy(HistoryList[historyCnt].command, tok, 1024);
+                HistoryList[historyCnt].pid=pid;
+                time(&HistoryList[historyCnt].start_time);
+                HistoryList[historyCnt].execution_time=0.0;
+                // execcution time will be updated later
+                historyCnt++;
+            }
+            else{
+                printf("history is full");
+            }
+            waitpid(pid,NULL,0);
+            // waiting for the child process to finish
+            if(input_fd!=0){
+                close(input_fd);
+            }
+            input_fd=pipe_fd[0];
+            // read end is moved to input_fd
+        }
+        tok=__strtok_r(NULL, "|", &save_state);
+        cmd_cnt++;
+    }
+    if(input_fd!=0){
+        close(input_fd);
+        // closing the last pipes end in PP
+    }
+    if(historyCnt>0){
+        HistoryList[historyCnt-1].execution_time=difftime(time(NULL),HistoryList[historyCnt-1].start_time);
+
+    }
+    return 1;
+    
+}
+
+
+
 
 typedef struct{
     char command[1024]; 
