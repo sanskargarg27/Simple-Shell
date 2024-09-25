@@ -90,5 +90,6 @@ void shell_loop(){
 
 int main(){
     shell_loop();
+    printf("Hello sanskar");
     return 0;
 }
