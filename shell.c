@@ -5,7 +5,18 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <time.h>
 
+typedef struct{
+    char command[1024]; 
+    time_t start_time;
+    double execution_time;
+    pid_t pid;
+}history_t;
+
+history_t HistoryList[100];
+int historyCnt = 0;
+ 
 int create_process_and_run(char* cmd){
     char* args[100];
     int cnt = 0;
@@ -32,8 +43,20 @@ int create_process_and_run(char* cmd){
         perror("exec failed");
     }
     else{
+        if (historyCnt>= 100){
+            for (int i = 1; i < 100; i++){
+                HistoryList[i-1] = HistoryList[i];
+            }
+            historyCnt--;
+        }
+
+        time(&HistoryList[historyCnt].start_time);
+        HistoryList[historyCnt].pid = ret;
+        strncpy(HistoryList[historyCnt].command, cmd, 1024);
         wait(NULL);
     }
+    HistoryList[historyCnt].execution_time = difftime(time(NULL), HistoryList[historyCnt].start_time);
+    historyCnt++;
     return 1;
 }
 
