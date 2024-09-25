@@ -9,17 +9,19 @@
 int create_process_and_run(char* cmd){
     char* args[100];
     int cnt = 0;
-
     char *token;
+
     token = strtok(cmd, " ");
 
-    while(token != NULL && cnt < 99){
+    while(token != NULL && cnt < 100){
         args[cnt] = token;
         cnt++;
         token = strtok(NULL, " ");
     }
 
-    args[cnt] = NULL;
+    if (cnt < 100){
+        args[cnt] = NULL;
+    }
 
     int ret = fork();
     if (ret < 0){
@@ -32,6 +34,7 @@ int create_process_and_run(char* cmd){
     else{
         wait(NULL);
     }
+    return 1;
 }
 
 void remove_space(char* str){
@@ -54,7 +57,7 @@ void remove_space(char* str){
 
 char* read_user_input(){
     char* inp = malloc(1024 * sizeof(char));
-    fgets(inp, sizeof(inp), stdin);
+    fgets(inp, 1024, stdin);
 
     remove_space(inp);
     
@@ -79,8 +82,9 @@ void shell_loop(){
     do {
         printf("simpleShell:~$ ");
         char* cmd = read_user_input();
-        // printf("%s\n", cmd);
+        printf("cmd: %s\n", cmd);
         status = launch(cmd);
+        free(cmd);
     } while(status);
 }
 
