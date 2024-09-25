@@ -16,35 +16,8 @@ typedef struct{
 
 history_t HistoryList[100];
 int historyCnt = 0;
-
-void command_history(){
-    if(historyCnt==0){
-        printf("No commands in history\n");
-        return;
-    }
-    // printf("Command History: \n");
-    int i=0;
-    while(i<historyCnt){
-        printf("Command [%d]:\n",i+1);
-        printf("PID: %d\n", HistoryList[i].pid);
-        printf("Command: %s\n", HistoryList[i].command);
-        printf("Start time: %s", ctime(&HistoryList[i].start_time));
-        printf("Execution Duration: %.2f seconds\n", HistoryList[i].execution_time);
-        printf("-----------------------------\n");
-        i++;
-    }
-
-}
-
  
 int create_process_and_run(char* cmd){
-    if (strcmp(cmd, "exit") == 0){
-        return 1;
-    }
-    else if (strcmp(cmd, "history") == 0){
-        command_history();
-        return 1;
-    }
     char* args[100];
     int cnt = 0;
     char *token;
@@ -113,72 +86,41 @@ char* read_user_input(){
     
     return inp;
 }
+int run_piped_process(char* cmd1, char* cmd2){
+    pid_t pid1, pid2;
+    int fd[2];
 
-int run_piped_process(char* cmd1, char* cmd2, char* cmd){
-    int pipe_fd[2]; // Pipe - read & write end
-    pid_t pid1, pid2; // This is a child 1 & child 2 - forked twice xD
-
-    if (pipe(pipe_fd) == -1) { // Create a pipe
-        perror("Pipe error");
-        exit(1);
-    }
+    pipe(fd);
 
     pid1 = fork();
-
-    if (pid1 < 0) {
-        perror("Fork error");
+    if (pid1 < 0){
+        perror("fork error");
+    }
+    else if (pid1 == 0){
+        close(fd[0]);
+        dup2(fd[1], STDOUT_FILENO);
+        close(fd[1]);
+        system(cmd1);
         exit(1);
     }
-    else if (pid1 == 0) { // Child process 1 (writes to the pipe)
-        close(pipe_fd[0]); // Close the read end of the pipe
-        if (dup2(pipe_fd[1], STDOUT_FILENO) == -1) {
-            perror("dup2 error");
+    else{
+        pid2 = fork();
+
+        if (pid2 < 0){
+            perror("fork error");
+        }
+        else if (pid2 == 0){
+            close(fd[1]);
+            dup2(fd[0], STDIN_FILENO);
+            close(fd[0]);
+            system(cmd2);
             exit(1);
         }
-        close(pipe_fd[1]);
-
-        // Execute the first command
-        if (system(cmd) == -1) { // Systuummmmm - To execute command. IYKYK ; )
-            perror("System error");
-            exit(1);
-        }
-        exit(0);
-    }
-    else { // Parent process
-        pid2 = fork(); // Child process 2
-
-        if (pid2 < 0) {
-            perror("Fork error");
-            exit(1);
-        }
-        else if (pid2 == 0) { // Child process 2 (reads from the pipe)
-            close(pipe_fd[1]); // Close the write end of the pipe
-            if (dup2(pipe_fd[0], STDIN_FILENO) == -1) {
-                perror("dup2 error");
-                exit(1);
-            }
-            close(pipe_fd[0]);
-
-            // Execute the second command
-            if (system(cmd) == -1) {
-                perror("System error");
-                exit(1);
-            }
-            exit(0);
-        }
-        else { // Parent process
-            close(pipe_fd[0]);
-            close(pipe_fd[1]);
-
-            // Good Parenting Practise - Prevent Orphan Children
-            if (waitpid(pid1, NULL, 0) == -1) {
-                perror("waitpid error");
-                exit(1);
-            }
-            if (waitpid(pid2, NULL, 0) == -1) {
-                perror("waitpid error");
-                exit(1);
-            }
+        else{
+            close(fd[0]);
+            close(fd[1]);
+            waitpid(pid1, NULL, 0);
+            waitpid(pid2, NULL, 0);
         }
     }
     return 1;
@@ -204,7 +146,7 @@ int launch(char* cmd){
         remove_space(cmd1);
         remove_space(cmd2);
         // printf("C1: %s, C2: %s", cmd1, cmd2);
-        status = run_piped_process(cmd1, cmd2, cmd);
+        status = run_piped_process(cmd1, cmd2);
     }
     return status;
 }
@@ -213,7 +155,7 @@ void sigint_handler(int signum){
     printf("\nCtrl-c pressed\n");
     printf("\nExiting the shell...........\n");
     printf("Command History:\n");
-    command_history();  // Calling the function to display the command history 
+    // display_history();  // Calling the function to display the command history 
     exit(0);  
 }
 
@@ -235,6 +177,7 @@ void shell_loop(){
     do {
         printf("simpleShell:~$ ");
         char* cmd = read_user_input();
+        printf("cmd: %s\n", cmd);
         status = launch(cmd);
         free(cmd);
     } while(status);
