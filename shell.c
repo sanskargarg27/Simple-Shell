@@ -5,7 +5,19 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <time.h>
 
+void command_history();
+typedef struct{
+    char command[1024]; 
+    time_t start_time;
+    double execution_time;
+    pid_t pid;
+}history_t;
+
+history_t HistoryList[100];
+int historyCnt = 0;
+ 
 int create_process_and_run(char* cmd){
     char* args[100];
     int cnt = 0;
@@ -26,14 +38,27 @@ int create_process_and_run(char* cmd){
     int ret = fork();
     if (ret < 0){
         perror("fork error");
+        return -1;
     }
     else if(ret == 0){
         execvp(args[0], args);
         perror("exec failed");
     }
     else{
+        if (historyCnt>= 100){
+            for (int i = 1; i < 100; i++){
+                HistoryList[i-1] = HistoryList[i];
+            }
+            historyCnt--;
+        }
+
+        time(&HistoryList[historyCnt].start_time);
+        HistoryList[historyCnt].pid = ret;
+        strncpy(HistoryList[historyCnt].command, cmd, 1024);
         wait(NULL);
     }
+    HistoryList[historyCnt].execution_time = difftime(time(NULL), HistoryList[historyCnt].start_time);
+    historyCnt++;
     return 1;
 }
 
@@ -81,7 +106,7 @@ void sigint_handler(int signum){
     printf("Ctrl-c pressed\n");
     printf("\nExiting the shell...........\n");
     printf("Command History:\n");
-    // display_history();  // Calling the function to display the command history 
+    command_history();  // Calling the function to display the command history 
     exit(0);  
 }
 
@@ -107,6 +132,24 @@ void shell_loop(){
         status = launch(cmd);
         free(cmd);
     } while(status);
+}
+void command_history(){
+    if(historyCnt==0){
+        printf("No commands in history\n");
+        return;
+    }
+    // printf("Command History: \n");
+    int i=0;
+    while(i<historyCnt){
+        printf("Command [%d]:\n",i+1);
+        printf("PID: %d\n", HistoryList[i].pid);
+        printf("Command: %s\n", HistoryList[i].command);
+        printf("Start time: %s", ctime(&HistoryList[i].start_time));
+        printf("Execution Duration: %.2f seconds\n", HistoryList[i].execution_time);
+        printf("-----------------------------\n");
+        i++;
+    }
+
 }
 
 int main(){
