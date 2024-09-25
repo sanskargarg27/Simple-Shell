@@ -76,6 +76,27 @@ int launch(char* cmd){
 
     }
 }
+// Signal handler for SIGINT (Ctrl+C)
+void sigint_handler(int signum){
+    printf("Ctrl-c pressed\n");
+    printf("\nExiting the shell...........\n");
+    printf("Command History:\n");
+    // display_history();  // Calling the function to display the command history 
+    exit(0);  
+}
+
+// Setting the signal handler for Ctrl+C using sigaction
+void set_signal_handler(){
+    struct sigaction sa;  
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = sigint_handler;
+    sigemptyset(&sa.sa_mask);
+
+    if (sigaction(SIGINT, &sa, NULL) == -1){
+        perror("sigaction error");  
+        exit(EXIT_FAILURE);  
+    }
+}
 
 void shell_loop(){
     int status;
@@ -89,7 +110,7 @@ void shell_loop(){
 }
 
 int main(){
+    set_signal_handler();
     shell_loop();
-    printf("Hello sanskar");
     return 0;
 }
