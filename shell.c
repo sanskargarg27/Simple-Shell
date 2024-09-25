@@ -7,6 +7,25 @@
 #include <sys/wait.h>
 #include <time.h>
 
+void command_history(){
+    if(historyCnt==0){
+        printf("No commands in history\n");
+        return;
+    }
+    // printf("Command History: \n");
+    int i=0;
+    while(i<historyCnt){
+        printf("Command [%d]:\n",i+1);
+        printf("PID: %d\n", HistoryList[i].pid);
+        printf("Command: %s\n", HistoryList[i].command);
+        printf("Start time: %s", ctime(&HistoryList[i].start_time));
+        printf("Execution Duration: %.2f seconds\n", HistoryList[i].execution_time);
+        printf("-----------------------------\n");
+        i++;
+    }
+
+}
+
 typedef struct{
     char command[1024]; 
     time_t start_time;
@@ -37,6 +56,7 @@ int create_process_and_run(char* cmd){
     int ret = fork();
     if (ret < 0){
         perror("fork error");
+        return -1;
     }
     else if(ret == 0){
         execvp(args[0], args);
@@ -155,7 +175,7 @@ void sigint_handler(int signum){
     printf("\nCtrl-c pressed\n");
     printf("\nExiting the shell...........\n");
     printf("Command History:\n");
-    // display_history();  // Calling the function to display the command history 
+    command_history();  // Calling the function to display the command history 
     exit(0);  
 }
 
