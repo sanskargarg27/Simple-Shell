@@ -177,10 +177,11 @@ int create_process_and_run(char* cmd){
     else if(ret == 0){
         if (strcmp(cmd, "history") == 0){
             show_history();
-            return 1;
+            exit(0);
         }
         execvp(args[0], args);
         perror("exec failed");
+        exit(1);
     }
     else{
         if (historyCnt>= 100){
