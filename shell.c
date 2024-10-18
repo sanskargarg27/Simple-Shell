@@ -16,6 +16,122 @@ typedef struct{
 
 history_t HistoryList[100];
 int historyCnt = 0;
+char* History[100];
+int cnt = 0;
+
+void show_history(){
+    for (int i = 0; i < cnt; i++){
+
+        printf("%s\n", History[i]);
+    }
+}
+
+void remove_space(char* str){
+    int start = 0;
+    int end = strlen(str) - 1;
+    // printf("%d\n", end);
+
+    while (isspace(str[start])){
+        start++;
+    }
+    while (end >= 0 && isspace(str[end])){
+        end--;
+    }
+    for (int i = 0; i <= end - start; i++){
+        str[i] = str[i + start];
+    }
+    str[end - start + 1] = '\0';
+}
+
+int history_piped_commands(char*cmd){
+    char *save_state; // pointer for strtok_r
+    char *tok;
+    int pipe_fd[2]; //pipe for IPC
+    int input_fd=0;
+    pid_t pid;
+    int cmd_cnt=0;
+    // tokenize the input
+    tok= strtok_r(cmd,"|", &save_state);
+// processing each command
+    while(tok!=NULL){
+        remove_space(tok);
+        // creating a pipe
+        if(pipe(pipe_fd)==-1){
+            perror("Pipe error");
+            exit(EXIT_FAILURE);
+        }
+
+        // fork and executing the command
+        pid=fork();
+        if(pid<0){
+            perror("fork error");
+            exit(EXIT_FAILURE);
+        }
+        else if(pid==0){
+            // child process
+            if(input_fd!=0){
+                dup2(input_fd,STDIN_FILENO);
+                close(input_fd);
+                // read from previous pipe, if not the first command
+            }
+            if(save_state!=NULL){
+                dup2(pipe_fd[1],STDOUT_FILENO);
+                // write to the current pipe 
+            }
+            close(pipe_fd[0]);
+            close(pipe_fd[1]);
+            // closing the ends of the pipe
+
+            char*args[100];
+            int cnt=0;
+            char*arg_tok=strtok(tok, " ");
+            // tokenizing for exec
+            while(arg_tok!=NULL && cnt<100){
+                args[cnt++]=arg_tok;
+                arg_tok=strtok(NULL, " ");
+            }
+            args[cnt]=NULL;
+            execvp(args[0], args);
+            // execute
+            perror("exec failed");
+            exit(EXIT_FAILURE);
+        }
+        else{
+            // parent process
+            close(pipe_fd[1]);
+            // closing the write end
+            if(historyCnt<100){
+                strncpy(HistoryList[historyCnt].command, tok, 1024);
+                HistoryList[historyCnt].pid=pid;
+                time(&HistoryList[historyCnt].start_time);
+                HistoryList[historyCnt].execution_time=0.0;
+                // execcution time will be updated later
+                historyCnt++;
+            }
+            else{
+                printf("history is full");
+            }
+            waitpid(pid,NULL,0);
+            // waiting for the child process to finish
+            if(input_fd!=0){
+                close(input_fd);
+            }
+            input_fd=pipe_fd[0];
+            // read end is moved to input_fd
+        }
+        tok=__strtok_r(NULL, "|", &save_state);
+        cmd_cnt++;
+    }
+    if(input_fd!=0){
+        close(input_fd);
+        // closing the last pipes end in PP
+    }
+    if(historyCnt>0){
+        HistoryList[historyCnt-1].execution_time=difftime(time(NULL),HistoryList[historyCnt-1].start_time);
+
+    }
+    return 1;   
+}
 
 void command_history(){
     if(historyCnt==0){
@@ -35,7 +151,6 @@ void command_history(){
     }
 
 }
-
  
 int create_process_and_run(char* cmd){
     char* args[100];
@@ -60,6 +175,10 @@ int create_process_and_run(char* cmd){
         return -1;
     }
     else if(ret == 0){
+        if (strcmp(cmd, "history") == 0){
+            show_history();
+            return 1;
+        }
         execvp(args[0], args);
         perror("exec failed");
     }
@@ -81,33 +200,17 @@ int create_process_and_run(char* cmd){
     return 1;
 }
 
-void remove_space(char* str){
-    int start = 0;
-    int end = strlen(str) - 1;
-    // printf("%d\n", end);
-
-    while (isspace(str[start])){
-        start++;
-    }
-    while (end >= 0 && isspace(str[end])){
-        end--;
-    }
-    for (int i = 0; i <= end - start; i++){
-        str[i] = str[i + start];
-    }
-    str[end - start + 1] = '\0';
-}
-
-
 char* read_user_input(){
     char* inp = malloc(1024 * sizeof(char));
     fgets(inp, 1024, stdin);
 
     remove_space(inp);
-    
+    char* temp = malloc(strlen(inp));
+    strncpy(temp, inp, strlen(inp));
+    History[cnt++] = temp;
     return inp;
 }
-int run_piped_process(char* cmd1, char* cmd2){
+int run_piped_process(char* cmd1, char* cmd2, char* cmd){
     pid_t pid1, pid2;
     int fd[2];
 
@@ -121,7 +224,7 @@ int run_piped_process(char* cmd1, char* cmd2){
         close(fd[0]);
         dup2(fd[1], STDOUT_FILENO);
         close(fd[1]);
-        system(cmd1);
+        system(cmd);
         exit(1);
     }
     else{
@@ -134,7 +237,7 @@ int run_piped_process(char* cmd1, char* cmd2){
             close(fd[1]);
             dup2(fd[0], STDIN_FILENO);
             close(fd[0]);
-            system(cmd2);
+            system(cmd);
             exit(1);
         }
         else{
@@ -144,17 +247,26 @@ int run_piped_process(char* cmd1, char* cmd2){
             waitpid(pid2, NULL, 0);
         }
     }
+    history_piped_commands(cmd);
     return 1;
 }
 
 int launch(char* cmd){
     int status;
+
+    if(strcmp(cmd, "exit") == 0){
+        command_history();
+        printf("Shell ended Successfully!\n");
+        exit(0);
+    }
     // Unpiped command
-    if (strchr(cmd, '|') == NULL){
+    else if (strchr(cmd, '|') == NULL){
         status = create_process_and_run(cmd);
     }
     // Piped command
     else{
+        char* cpy = malloc(strlen(cmd)+1);
+        strcpy(cpy, cmd);
         char* token = strtok(cmd, "|");
 
         char* cmd1;
@@ -167,8 +279,9 @@ int launch(char* cmd){
         remove_space(cmd1);
         remove_space(cmd2);
         // printf("C1: %s, C2: %s", cmd1, cmd2);
-        status = run_piped_process(cmd1, cmd2);
+        status = run_piped_process(cmd1, cmd2, cpy);
     }
+
     return status;
 }
 // Signal handler for SIGINT (Ctrl+C)
@@ -197,8 +310,7 @@ void shell_loop(){
     int status;
     do {
         printf("simpleShell:~$ ");
-        char* cmd = read_user_input();
-        printf("cmd: %s\n", cmd);
+        char* cmd = read_user_input();        
         status = launch(cmd);
         free(cmd);
     } while(status);
